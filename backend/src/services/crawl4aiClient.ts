@@ -5,7 +5,8 @@ interface CrawlResult {
   count: number;
 }
 
-const CRAWL4AI_URL = process.env.CRAWL4AI_URL || 'http://localhost:8000';
+const CRAWL4AI_URL = process.env.CRAWL4AI_API_URL || 'http://localhost:8000';
+const CRAWL4AI_API_KEY = process.env.CRAWL4AI_API_KEY || '';
 
 /**
  * Search for companies in a given market using Crawl4AI
