@@ -8,11 +8,23 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const PORT = process.env.PORT || 8080;
 const MONGODB_URI = process.env.MONGODB_URI;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://huntingplatform.netlify.app';
 
 const app = express();
 
 // Middleware
-app.use(cors());
+const corsOptions = {
+  origin: [
+    'https://huntingplatform.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:5174'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -88,6 +100,21 @@ app.get('/api/playbooks/:subChannel', (req, res) => {
   res.json({
     message: 'Playbook retrieval endpoint',
     subChannel: req.params.subChannel,
+  });
+});
+
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    name: 'AFH Hunting Engine API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      hunts: '/api/hunts',
+      playbooks: '/api/playbooks/:subChannel',
+      docs: '/api/docs'
+    }
   });
 });
 
