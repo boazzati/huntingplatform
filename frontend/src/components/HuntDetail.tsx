@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { huntsAPI, Hunt } from '../services/api';
+import { huntsAPI, playbooksAPI, Hunt, Playbook } from '../services/api';
 
 interface HuntDetailProps {
   huntId: string;
@@ -64,29 +64,62 @@ export function HuntDetail({ huntId, onBack }: HuntDetailProps) {
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [stepNotes, setStepNotes] = useState<Record<number, string>>({});
+  const [savingStep, setSavingStep] = useState(false);
+  const [generatingPlaybook, setGeneratingPlaybook] = useState(false);
+  const [playbookGenerated, setPlaybookGenerated] = useState(false);
+  const [playbook, setPlaybook] = useState<Playbook | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    const loadHunt = async () => {
-      try {
-        const data = await huntsAPI.getById(huntId);
-        setHunt(data);
-        setCurrentStep(data.currentStep || 1);
-      } catch (error) {
-        console.error('Error loading hunt:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadHunt();
   }, [huntId]);
 
+  const loadHunt = async () => {
+    try {
+      const data = await huntsAPI.getById(huntId);
+      setHunt(data);
+      setCurrentStep(data.currentStep || 1);
+    } catch (error) {
+      console.error('Error loading hunt:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleStepChange = async (step: number) => {
     setCurrentStep(step);
+    setSavingStep(true);
+    setSuccessMessage('');
+
     try {
-      await huntsAPI.updateStep(huntId, step);
+      const updated = await huntsAPI.updateStep(huntId, step);
+      setHunt(updated);
+      setSuccessMessage(`Step updated to ${step}: ${HUNTING_STEPS[step - 1].title}`);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
       console.error('Error updating step:', error);
+      alert('Failed to save step. Please try again.');
+    } finally {
+      setSavingStep(false);
+    }
+  };
+
+  const handleGeneratePlaybook = async () => {
+    if (!hunt) return;
+
+    setGeneratingPlaybook(true);
+    setSuccessMessage('');
+
+    try {
+      const generatedPlaybook = await playbooksAPI.generate(hunt.subChannel);
+      setPlaybook(generatedPlaybook);
+      setPlaybookGenerated(true);
+      setSuccessMessage('Playbook generated successfully!');
+    } catch (error) {
+      console.error('Error generating playbook:', error);
+      alert('Failed to generate playbook. Please try again.');
+    } finally {
+      setGeneratingPlaybook(false);
     }
   };
 
@@ -108,6 +141,64 @@ export function HuntDetail({ huntId, onBack }: HuntDetailProps) {
         >
           Back
         </button>
+      </div>
+    );
+  }
+
+  if (playbookGenerated && playbook) {
+    return (
+      <div className="space-y-6">
+        <button
+          onClick={() => setPlaybookGenerated(false)}
+          className="px-4 py-2 text-sm bg-gray-200 rounded-md hover:bg-gray-300"
+        >
+          ← Back to Hunt
+        </button>
+
+        <div className="bg-card rounded-lg border p-8">
+          <h2 className="text-3xl font-bold mb-6">{playbook.subChannel} Hunting Playbook</h2>
+          
+          <div className="prose prose-sm max-w-none">
+            {playbook.contentMd.split('\n').map((line, idx) => {
+              if (line.startsWith('# ')) {
+                return <h1 key={idx} className="text-2xl font-bold mt-6 mb-3">{line.replace('# ', '')}</h1>;
+              }
+              if (line.startsWith('## ')) {
+                return <h2 key={idx} className="text-xl font-bold mt-4 mb-2">{line.replace('## ', '')}</h2>;
+              }
+              if (line.startsWith('**') && line.endsWith('**')) {
+                return <p key={idx} className="font-semibold mt-2">{line}</p>;
+              }
+              if (line.trim() === '') {
+                return <div key={idx} className="h-2"></div>;
+              }
+              return <p key={idx} className="text-sm leading-relaxed">{line}</p>;
+            })}
+          </div>
+
+          <div className="mt-8 flex gap-3">
+            <button
+              onClick={() => setPlaybookGenerated(false)}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-medium"
+            >
+              Back to Hunt
+            </button>
+            <button
+              onClick={() => {
+                const element = document.createElement('a');
+                element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(playbook.contentMd));
+                element.setAttribute('download', `${playbook.subChannel}_playbook.md`);
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+              }}
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 font-medium"
+            >
+              Download Playbook
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -135,6 +226,13 @@ export function HuntDetail({ huntId, onBack }: HuntDetailProps) {
           </p>
         </div>
       </div>
+
+      {/* Success Message */}
+      {successMessage && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+          {successMessage}
+        </div>
+      )}
 
       {/* Progress Indicator */}
       <div className="bg-card rounded-lg border p-6">
@@ -165,13 +263,14 @@ export function HuntDetail({ huntId, onBack }: HuntDetailProps) {
                   : currentStep > huntStep.step
                   ? 'border-green-500 bg-green-50'
                   : 'border-gray-200 bg-white hover:border-primary/50'
-              }`}
+              } ${savingStep ? 'opacity-50' : ''}`}
+              style={{ pointerEvents: savingStep ? 'none' : 'auto' }}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                      className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm flex-shrink-0 ${
                         currentStep > huntStep.step
                           ? 'bg-green-500 text-white'
                           : currentStep === huntStep.step
@@ -188,7 +287,7 @@ export function HuntDetail({ huntId, onBack }: HuntDetailProps) {
                   </div>
                 </div>
                 {currentStep === huntStep.step && (
-                  <span className="ml-4 px-3 py-1 bg-primary text-white text-xs rounded-full font-medium">
+                  <span className="ml-4 px-3 py-1 bg-primary text-white text-xs rounded-full font-medium flex-shrink-0">
                     Current
                   </span>
                 )}
@@ -250,9 +349,11 @@ export function HuntDetail({ huntId, onBack }: HuntDetailProps) {
           Back to Hunts
         </button>
         <button
-          className="flex-1 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 font-medium"
+          onClick={handleGeneratePlaybook}
+          disabled={generatingPlaybook}
+          className="flex-1 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
         >
-          Generate Playbook
+          {generatingPlaybook ? 'Generating...' : 'Generate Playbook'}
         </button>
       </div>
     </div>

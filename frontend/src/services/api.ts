@@ -25,14 +25,16 @@ export interface Hunt {
 
 export interface Account {
   name: string;
-  markets: string[];
-  segment: string;
-  score: number;
-  currentStep: number;
-  rationale: string;
-  ideas: Array<{ title: string; description: string }>;
-  stage: string;
-  steps: Array<{ step: number; name: string; note: string }>;
+  score?: number;
+  step?: number;
+  notes?: string;
+  markets?: string[];
+  segment?: string;
+  currentStep?: number;
+  rationale?: string;
+  ideas?: Array<{ title: string; description: string }>;
+  stage?: string;
+  steps?: Array<{ step: number; name: string; note: string }>;
 }
 
 export interface Playbook {
