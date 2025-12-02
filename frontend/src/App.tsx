@@ -2,20 +2,32 @@ import { useState } from 'react';
 import './styles/globals.css';
 import { HuntForm } from './components/HuntForm';
 import { HuntList } from './components/HuntList';
+import { HuntDetail } from './components/HuntDetail';
 import { PlaybookPage } from './components/PlaybookPage';
 
-type Page = 'hunts' | 'playbook';
+type Page = 'hunts' | 'hunt-detail' | 'playbook';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('hunts');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedSubChannel, setSelectedSubChannel] = useState('');
+  const [selectedHuntId, setSelectedHuntId] = useState('');
   
   // Deployment trigger
   console.log('AFH Hunting Engine v1.0.0 - Deployed');
 
   const handleHuntSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const handleHuntSelect = (huntId: string) => {
+    setSelectedHuntId(huntId);
+    setCurrentPage('hunt-detail');
+  };
+
+  const handleBackToHunts = () => {
+    setCurrentPage('hunts');
+    setSelectedHuntId('');
   };
 
   return (
@@ -38,7 +50,7 @@ function App() {
             <button
               onClick={() => setCurrentPage('hunts')}
               className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                currentPage === 'hunts'
+                currentPage === 'hunts' || currentPage === 'hunt-detail'
                   ? 'bg-primary text-white'
                   : 'bg-muted hover:bg-muted/80'
               }`}
@@ -67,9 +79,13 @@ function App() {
               <HuntForm onSuccess={handleHuntSuccess} />
             </div>
             <div className="lg:col-span-2">
-              <HuntList refreshTrigger={refreshTrigger} />
+              <HuntList refreshTrigger={refreshTrigger} onHuntSelect={handleHuntSelect} />
             </div>
           </div>
+        )}
+
+        {currentPage === 'hunt-detail' && (
+          <HuntDetail huntId={selectedHuntId} onBack={handleBackToHunts} />
         )}
 
         {currentPage === 'playbook' && (
