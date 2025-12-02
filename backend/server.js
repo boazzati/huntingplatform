@@ -8,7 +8,6 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const PORT = process.env.PORT || 8080;
 const MONGODB_URI = process.env.MONGODB_URI;
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://huntingplatform.netlify.app';
 
 const app = express();
 
@@ -61,6 +60,22 @@ const huntSchema = new mongoose.Schema({
 
 const Hunt = mongoose.model('Hunt', huntSchema);
 
+// Helper function to format hunt response
+const formatHuntResponse = (hunt) => {
+  return {
+    id: hunt._id.toString(),
+    subChannel: hunt.subChannel,
+    markets: hunt.markets,
+    focusBrands: hunt.focusBrands,
+    accounts: hunt.accounts,
+    huntResult: {
+      summary: `Hunt for ${hunt.subChannel}`,
+      totalAccounts: hunt.accounts.length
+    },
+    createdAt: hunt.createdAt
+  };
+};
+
 // Swagger Configuration
 const swaggerOptions = {
   definition: {
@@ -94,16 +109,25 @@ app.post('/api/hunts', async (req, res) => {
   try {
     const { subChannel, markets, focusBrands, maxAccounts } = req.body;
 
-    // Validate required fields
     if (!subChannel) {
       return res.status(400).json({ error: 'Sub-channel is required' });
     }
 
-    // Parse markets and brands
-    const marketsList = markets ? markets.split(',').map(m => m.trim()) : [];
-    const brandsList = focusBrands ? focusBrands.split(',').map(b => b.trim()) : [];
+    let marketsList = [];
+    let brandsList = [];
+    
+    if (typeof markets === 'string') {
+      marketsList = markets.split(',').map(m => m.trim()).filter(m => m);
+    } else if (Array.isArray(markets)) {
+      marketsList = markets;
+    }
+    
+    if (typeof focusBrands === 'string') {
+      brandsList = focusBrands.split(',').map(b => b.trim()).filter(b => b);
+    } else if (Array.isArray(focusBrands)) {
+      brandsList = focusBrands;
+    }
 
-    // Create new hunt
     const hunt = new Hunt({
       subChannel,
       markets: marketsList,
@@ -116,11 +140,7 @@ app.post('/api/hunts', async (req, res) => {
     await hunt.save();
 
     console.log(`✓ Hunt created: ${subChannel}`);
-    res.status(201).json({
-      success: true,
-      message: 'Hunt created successfully',
-      hunt: hunt
-    });
+    res.status(201).json(formatHuntResponse(hunt));
   } catch (error) {
     console.error('Error creating hunt:', error);
     res.status(500).json({ error: error.message });
@@ -134,7 +154,7 @@ app.get('/api/hunts', async (req, res) => {
     
     res.json({
       success: true,
-      data: hunts,
+      data: hunts.map(formatHuntResponse),
       pagination: {
         total: hunts.length,
         limit: 20,
@@ -156,10 +176,7 @@ app.get('/api/hunts/:id', async (req, res) => {
       return res.status(404).json({ error: 'Hunt not found' });
     }
 
-    res.json({
-      success: true,
-      hunt: hunt
-    });
+    res.json(formatHuntResponse(hunt));
   } catch (error) {
     console.error('Error fetching hunt:', error);
     res.status(500).json({ error: error.message });
@@ -169,7 +186,7 @@ app.get('/api/hunts/:id', async (req, res) => {
 // Update hunt step
 app.put('/api/hunts/:id/step', async (req, res) => {
   try {
-    const { step, notes } = req.body;
+    const { step } = req.body;
 
     const hunt = await Hunt.findByIdAndUpdate(
       req.params.id,
@@ -184,11 +201,7 @@ app.put('/api/hunts/:id/step', async (req, res) => {
       return res.status(404).json({ error: 'Hunt not found' });
     }
 
-    res.json({
-      success: true,
-      message: 'Hunt updated successfully',
-      hunt: hunt
-    });
+    res.json(formatHuntResponse(hunt));
   } catch (error) {
     console.error('Error updating hunt:', error);
     res.status(500).json({ error: error.message });
@@ -215,11 +228,7 @@ app.post('/api/hunts/:id/accounts', async (req, res) => {
       return res.status(404).json({ error: 'Hunt not found' });
     }
 
-    res.json({
-      success: true,
-      message: 'Account added successfully',
-      hunt: hunt
-    });
+    res.json(formatHuntResponse(hunt));
   } catch (error) {
     console.error('Error adding account:', error);
     res.status(500).json({ error: error.message });
@@ -230,39 +239,20 @@ app.post('/api/hunts/:id/accounts', async (req, res) => {
 app.post('/api/playbooks/:subChannel', async (req, res) => {
   try {
     const { subChannel } = req.params;
-
-    // Find hunt by sub-channel
     const hunt = await Hunt.findOne({ subChannel });
 
     if (!hunt) {
       return res.status(404).json({ error: 'Hunt not found' });
     }
 
-    // Generate basic playbook
-    const playbook = {
-      title: `${subChannel} Hunting Playbook`,
-      subChannel,
-      hunt_id: hunt._id,
-      steps: [
-        { step: 1, title: 'Define Opportunity', description: `Clarify sub-channel: ${subChannel}, Markets: ${hunt.markets.join(', ')}` },
-        { step: 2, title: 'Scan Universe', description: `Identified ${hunt.maxAccounts} potential customers` },
-        { step: 3, title: 'Prioritise & Score', description: 'Ranked targets on scale and market reach' },
-        { step: 4, title: 'Insight & Hypothesis', description: 'Formed hypotheses on shopper needs' },
-        { step: 5, title: 'PepsiCo Value Proposition', description: 'Designed platform ideas per target' },
-        { step: 6, title: 'Internal Alignment', description: 'Identified BU and bottler engagement' },
-        { step: 7, title: 'Approach Plan', description: 'Defined route in and key messages' },
-        { step: 8, title: 'Discovery & Qualification', description: 'First contact and key questions' },
-        { step: 9, title: 'Proposal & Negotiation', description: 'Shaped proposal and value drivers' },
-        { step: 10, title: 'Pilot & Learn', description: 'Recommended pilot design and KPIs' }
-      ],
-      accounts: hunt.accounts,
-      createdAt: new Date()
-    };
+    const contentMd = `# ${subChannel} Hunting Playbook\n\n## Overview\nHunt for ${subChannel} with focus on ${hunt.focusBrands.join(', ')} in ${hunt.markets.join(', ')}.\n\n## 10-Step Hunting Model\n\n1. **Define Opportunity** - Clarify sub-channel: ${subChannel}\n2. **Scan Universe** - Build long-list of potential customers\n3. **Prioritise & Score** - Rank targets on scale and reach\n4. **Insight & Hypothesis** - Form hypotheses on needs\n5. **PepsiCo Value Proposition** - Design platform ideas\n6. **Internal Alignment** - Identify BU engagement\n7. **Approach Plan** - Define route in\n8. **Discovery & Qualification** - First contact\n9. **Proposal & Negotiation** - Shape proposal\n10. **Pilot & Learn** - Pilot design\n\n## Accounts (${hunt.accounts.length})\n${hunt.accounts.length > 0 ? hunt.accounts.map((a, i) => `${i + 1}. ${a.name} (Score: ${a.score})`).join('\n') : 'No accounts yet'}`;
 
     res.status(201).json({
-      success: true,
-      message: 'Playbook generated successfully',
-      playbook: playbook
+      id: hunt._id.toString(),
+      subChannel,
+      version: 1,
+      contentMd,
+      createdAt: new Date()
     });
   } catch (error) {
     console.error('Error generating playbook:', error);
@@ -280,29 +270,14 @@ app.get('/api/playbooks/:subChannel', async (req, res) => {
       return res.status(404).json({ error: 'Hunt not found' });
     }
 
-    const playbook = {
-      title: `${subChannel} Hunting Playbook`,
-      subChannel,
-      hunt_id: hunt._id,
-      steps: [
-        { step: 1, title: 'Define Opportunity', description: `Clarify sub-channel: ${subChannel}` },
-        { step: 2, title: 'Scan Universe', description: 'Build long-list of potential customers' },
-        { step: 3, title: 'Prioritise & Score', description: 'Rank targets on scale and reach' },
-        { step: 4, title: 'Insight & Hypothesis', description: 'Form hypotheses on needs' },
-        { step: 5, title: 'PepsiCo Value Proposition', description: 'Design platform ideas' },
-        { step: 6, title: 'Internal Alignment', description: 'Identify BU engagement' },
-        { step: 7, title: 'Approach Plan', description: 'Define route in' },
-        { step: 8, title: 'Discovery & Qualification', description: 'First contact' },
-        { step: 9, title: 'Proposal & Negotiation', description: 'Shape proposal' },
-        { step: 10, title: 'Pilot & Learn', description: 'Pilot design' }
-      ],
-      accounts: hunt.accounts,
-      createdAt: hunt.createdAt
-    };
+    const contentMd = `# ${subChannel} Hunting Playbook\n\n## Overview\nHunt for ${subChannel} with focus on ${hunt.focusBrands.join(', ')} in ${hunt.markets.join(', ')}.\n\n## 10-Step Hunting Model\n\n1. **Define Opportunity** - Clarify sub-channel: ${subChannel}\n2. **Scan Universe** - Build long-list of potential customers\n3. **Prioritise & Score** - Rank targets on scale and reach\n4. **Insight & Hypothesis** - Form hypotheses on needs\n5. **PepsiCo Value Proposition** - Design platform ideas\n6. **Internal Alignment** - Identify BU engagement\n7. **Approach Plan** - Define route in\n8. **Discovery & Qualification** - First contact\n9. **Proposal & Negotiation** - Shape proposal\n10. **Pilot & Learn** - Pilot design\n\n## Accounts (${hunt.accounts.length})\n${hunt.accounts.length > 0 ? hunt.accounts.map((a, i) => `${i + 1}. ${a.name} (Score: ${a.score})`).join('\n') : 'No accounts yet'}`;
 
     res.json({
-      success: true,
-      playbook: playbook
+      id: hunt._id.toString(),
+      subChannel,
+      version: 1,
+      contentMd,
+      createdAt: hunt.createdAt
     });
   } catch (error) {
     console.error('Error fetching playbook:', error);
@@ -342,10 +317,7 @@ app.use((err, req, res, next) => {
 // Start server
 const startServer = async () => {
   try {
-    // Connect to MongoDB
     await connectDB();
-
-    // Start listening
     app.listen(PORT, () => {
       console.log(`✓ Server running on port ${PORT}`);
       console.log(`✓ Environment: ${NODE_ENV}`);
