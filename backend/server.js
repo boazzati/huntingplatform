@@ -43,7 +43,14 @@ const connectDB = async () => {
 
 // MongoDB Schemas
 const huntSchema = new mongoose.Schema({
-  subChannel: { type: String, required: true },
+  subChannel: { 
+    type: String, 
+    required: true, 
+    unique: true, 
+    lowercase: true, 
+    trim: true,
+    index: true
+  },
   markets: [String],
   focusBrands: [String],
   maxAccounts: { type: Number, default: 10 },
@@ -68,6 +75,7 @@ const formatHuntResponse = (hunt) => {
     markets: hunt.markets,
     focusBrands: hunt.focusBrands,
     accounts: hunt.accounts,
+    currentStep: hunt.currentStep,
     huntResult: {
       summary: `Hunt for ${hunt.subChannel}`,
       totalAccounts: hunt.accounts.length
@@ -113,6 +121,14 @@ app.post('/api/hunts', async (req, res) => {
       return res.status(400).json({ error: 'Sub-channel is required' });
     }
 
+    // Check if hunt with same subChannel already exists (case-insensitive)
+    const existingHunt = await Hunt.findOne({ subChannel: subChannel.toLowerCase().trim() });
+    if (existingHunt) {
+      return res.status(409).json({ 
+        error: `A hunt with the name "${subChannel}" already exists. Please use a different name.` 
+      });
+    }
+
     let marketsList = [];
     let brandsList = [];
     
@@ -129,7 +145,7 @@ app.post('/api/hunts', async (req, res) => {
     }
 
     const hunt = new Hunt({
-      subChannel,
+      subChannel: subChannel.trim(),
       markets: marketsList,
       focusBrands: brandsList,
       maxAccounts: maxAccounts || 10,
@@ -143,6 +159,9 @@ app.post('/api/hunts', async (req, res) => {
     res.status(201).json(formatHuntResponse(hunt));
   } catch (error) {
     console.error('Error creating hunt:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'A hunt with this name already exists. Please use a different name.' });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -235,11 +254,32 @@ app.post('/api/hunts/:id/accounts', async (req, res) => {
   }
 });
 
+// Delete a hunt
+app.delete('/api/hunts/:id', async (req, res) => {
+  try {
+    const hunt = await Hunt.findByIdAndDelete(req.params.id);
+
+    if (!hunt) {
+      return res.status(404).json({ error: 'Hunt not found' });
+    }
+
+    console.log(`✓ Hunt deleted: ${hunt.subChannel}`);
+    res.json({ 
+      success: true, 
+      message: `Hunt "${hunt.subChannel}" has been deleted successfully`,
+      deletedHunt: formatHuntResponse(hunt)
+    });
+  } catch (error) {
+    console.error('Error deleting hunt:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Generate playbook
 app.post('/api/playbooks/:subChannel', async (req, res) => {
   try {
     const { subChannel } = req.params;
-    const hunt = await Hunt.findOne({ subChannel });
+    const hunt = await Hunt.findOne({ subChannel: subChannel.toLowerCase().trim() });
 
     if (!hunt) {
       return res.status(404).json({ error: 'Hunt not found' });
@@ -264,7 +304,7 @@ app.post('/api/playbooks/:subChannel', async (req, res) => {
 app.get('/api/playbooks/:subChannel', async (req, res) => {
   try {
     const { subChannel } = req.params;
-    const hunt = await Hunt.findOne({ subChannel });
+    const hunt = await Hunt.findOne({ subChannel: subChannel.toLowerCase().trim() });
 
     if (!hunt) {
       return res.status(404).json({ error: 'Hunt not found' });

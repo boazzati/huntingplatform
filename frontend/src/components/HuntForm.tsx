@@ -48,7 +48,13 @@ export function HuntForm({ onSuccess }: HuntFormProps) {
       reset();
       onSuccess?.(hunt.id || '');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create hunt');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to create hunt';
+      // Extract better error message from API response
+      if (errorMsg.includes('409') || errorMsg.includes('already exists')) {
+        setError('A hunt with this name already exists. Please use a different name.');
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }

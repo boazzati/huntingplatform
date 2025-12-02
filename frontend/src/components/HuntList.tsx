@@ -23,6 +23,7 @@ export function HuntList({ refreshTrigger, onHuntSelect }: HuntListProps) {
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadHunts();
@@ -39,6 +40,22 @@ export function HuntList({ refreshTrigger, onHuntSelect }: HuntListProps) {
       setError(err instanceof Error ? err.message : 'Failed to load hunts');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteHunt = async (huntId: string, huntName: string) => {
+    if (!window.confirm(`Are you sure you want to delete the hunt "${huntName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(huntId);
+    try {
+      await huntsAPI.delete(huntId);
+      setHunts(hunts.filter(h => h.id !== huntId));
+    } catch (err) {
+      alert(`Failed to delete hunt: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -62,15 +79,20 @@ export function HuntList({ refreshTrigger, onHuntSelect }: HuntListProps) {
         {hunts.map((hunt) => {
           const currentStep = hunt.currentStep || 1;
           const stepName = HUNTING_STEPS[currentStep - 1];
+          const isDeleting = deletingId === hunt.id;
           
           return (
             <div
               key={hunt.id}
-              onClick={() => onHuntSelect?.(hunt.id || '')}
-              className="p-6 bg-card border rounded-lg hover:shadow-lg hover:border-primary transition-all cursor-pointer"
+              className={`p-6 bg-card border rounded-lg hover:shadow-lg transition-all ${
+                isDeleting ? 'opacity-50 pointer-events-none' : 'hover:border-primary'
+              }`}
             >
               <div className="flex justify-between items-start mb-4">
-                <div>
+                <div
+                  onClick={() => !isDeleting && onHuntSelect?.(hunt.id || '')}
+                  className="flex-1 cursor-pointer"
+                >
                   <h3 className="text-lg font-semibold">{hunt.subChannel}</h3>
                   <p className="text-sm text-muted-foreground">
                     {new Date(hunt.createdAt || '').toLocaleDateString()}
@@ -85,7 +107,10 @@ export function HuntList({ refreshTrigger, onHuntSelect }: HuntListProps) {
               </div>
 
               {/* 10-Step Progress */}
-              <div className="mb-4 p-3 bg-primary/5 rounded-lg">
+              <div
+                onClick={() => !isDeleting && onHuntSelect?.(hunt.id || '')}
+                className="mb-4 p-3 bg-primary/5 rounded-lg cursor-pointer"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-primary">Step {currentStep}/10</span>
                   <span className="text-xs font-medium">{stepName}</span>
@@ -98,7 +123,10 @@ export function HuntList({ refreshTrigger, onHuntSelect }: HuntListProps) {
                 </div>
               </div>
 
-              <div className="mb-4">
+              <div
+                onClick={() => !isDeleting && onHuntSelect?.(hunt.id || '')}
+                className="mb-4 cursor-pointer"
+              >
                 <p className="text-sm mb-2">
                   <strong>Markets:</strong> {hunt.markets.join(', ')}
                 </p>
@@ -138,9 +166,23 @@ export function HuntList({ refreshTrigger, onHuntSelect }: HuntListProps) {
                 </div>
               )}
 
-              <button className="mt-4 w-full px-3 py-2 bg-primary/10 text-primary rounded text-sm font-medium hover:bg-primary/20 transition-colors">
-                View Details →
-              </button>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => !isDeleting && onHuntSelect?.(hunt.id || '')}
+                  className="flex-1 px-3 py-2 bg-primary/10 text-primary rounded text-sm font-medium hover:bg-primary/20 transition-colors disabled:opacity-50"
+                  disabled={isDeleting}
+                >
+                  View Details →
+                </button>
+                <button
+                  onClick={() => handleDeleteHunt(hunt.id || '', hunt.subChannel)}
+                  className="px-3 py-2 bg-red-50 text-red-600 rounded text-sm font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
+                  disabled={isDeleting}
+                  title="Delete this hunt"
+                >
+                  {isDeleting ? '...' : '🗑️'}
+                </button>
+              </div>
             </div>
           );
         })}

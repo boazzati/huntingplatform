@@ -70,13 +70,13 @@ export const huntsAPI = {
     return response.data;
   },
 
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/api/hunts/${id}`);
-  },
-
   updateStep: async (id: string, step: number): Promise<Hunt> => {
     const response = await apiClient.put(`/api/hunts/${id}/step`, { step });
     return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/hunts/${id}`);
   },
 };
 
