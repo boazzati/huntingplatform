@@ -1,0 +1,14 @@
+{
+  "name": "afh-hunting-engine",
+  "version": "1.0.0",
+  "description": "AFH Hunting Engine Backend",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "cd backend && npm start",
+    "dev": "cd backend && npm run dev",
+    "install": "cd backend && npm install"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
