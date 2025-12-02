@@ -10,6 +10,9 @@ function App() {
   const [currentPage, setCurrentPage] = useState<Page>('hunts');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedSubChannel, setSelectedSubChannel] = useState('');
+  
+  // Deployment trigger
+  console.log('AFH Hunting Engine v1.0.0 - Deployed');
 
   const handleHuntSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -21,7 +24,10 @@ function App() {
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-primary">🎯 AFH Hunting Engine</h1>
+            <div>
+              <h1 className="text-3xl font-bold text-primary">🎯 AFH Hunting Engine</h1>
+              <p className="text-xs text-muted-foreground mt-1">v1.0.0 - Live</p>
+            </div>
             <p className="text-sm text-muted-foreground">
               10-Step Business Development Automation for PepsiCo
             </p>
