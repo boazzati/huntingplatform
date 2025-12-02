@@ -12,7 +12,7 @@
   status = 200
 
 [context.production.environment]
-  VITE_API_BASE_URL = "https://api.huntingplatform.com"
+  VITE_API_BASE_URL = "https://huntingplatform-production.up.railway.app"
 
 [context.deploy-preview.environment]
   VITE_API_BASE_URL = "https://api-staging.huntingplatform.com"
